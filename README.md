@@ -8,14 +8,18 @@
 Synchro is a decentralized, self-custodial subscription management platform that empowers users to take full control of their recurring payments while using crypto. This MVP focuses on gift card–compatible subscriptions and optional email-based subscription detection, pending future automation with non-custodial card issuance on Stellar.
 
 ## Key Goals
+- **Prevent unwanted recurring charges**: Users only pay when they choose.
+- **Non-custodial design**: Synchro does not hold or control funds. Users manage payments directly via gift cards or local accounts.
+- **Subscription awareness**: Synchro sends reminders and provides direct cancel links.
+- **Scalable roadmap**: MVP will later evolve into fully automated payments once non-custodial Stellar card issuance is available.
 
-Prevent unwanted recurring charges: Users only pay when they choose.
+## Current Project Status (April 2026)
+- **Frontend**: Fully functional Next.js application integrated with Supabase and real-time analytics.
+- **Backend**: Robust Express.js server with 20+ routes, advanced risk detection, and automated reminder engine.
+- **Smart Contracts**: Functional Soroban contracts for subscription renewal, escrow, and virtual card interaction on Stellar Testnet.
+- **Overall**: Core MVP functionality is **90% complete** and undergoing final production hardening.
 
-Non-custodial design: Synchro does not hold or control funds. Users manage payments directly via gift cards or local accounts.
-
-Subscription awareness: Synchro sends reminders and provides direct cancel links.
-
-Scalable roadmap: MVP will later evolve into fully automated payments once non-custodial Stellar card issuance is available.
+For detailed status, see [CurrentState.md](file:///c:/Users/HP/Desktop/SYNCRO/CurrentState.md).
 
 ## Phase 1 (MVP) Workflow
 Supported Payment Method

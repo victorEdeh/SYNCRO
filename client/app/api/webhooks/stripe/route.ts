@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       
       // Here you would also update the user's subscription record
       // e.g., extend active_until, update plan_name, etc.
-      if (paymentIntentSucceeded.metadata.userId) {
+      if (paymentIntentSucceeded.metadata?.userId) {
         await supabase
           .from("profiles")
           .update({ 

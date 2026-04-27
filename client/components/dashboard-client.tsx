@@ -4,6 +4,8 @@ import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
 import { SuggestionsPanel } from "@/components/app/SuggestionsPanel"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { AlertTriangle, Info } from "lucide-react"
 
 interface Subscription {
   id: string
@@ -22,6 +24,7 @@ interface DashboardClientProps {
   initialNotifications: any[]
   initialProfile: any
   user: User
+  errors?: Record<string, any>
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -38,6 +41,7 @@ export default function DashboardClient({
   initialNotifications,
   initialProfile,
   user,
+  errors = {},
 }: DashboardClientProps) {
   const [subscriptions] = useState(initialSubscriptions)
   const [notifications] = useState(initialNotifications)
@@ -112,19 +116,48 @@ export default function DashboardClient({
       </header>
 
       <main className="px-4 sm:px-8 py-6 space-y-6">
+        {Object.keys(errors).length > 0 && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Partial data load</AlertTitle>
+            <AlertDescription>
+              Some information couldn't be loaded due to a temporary issue. We're showing what we have, but some sections might be incomplete.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Smart money-saving suggestions */}
         <SuggestionsPanel />
         {/* Stats row */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
-            { label: "Subscriptions", value: subscriptions.length },
-            { label: "Active", value: subscriptions.filter(s => s.status === "active").length },
-            { label: "Team Members", value: initialTeamMembers.length },
-            { label: "Unread Alerts", value: unreadCount },
-          ].map(({ label, value }) => (
-            <div key={label} className="bg-white rounded-lg border border-gray-200 p-4">
-              <p className="text-sm text-gray-500">{label}</p>
-              <p className="text-2xl font-semibold text-gray-900">{value}</p>
+            { 
+              label: "Subscriptions", 
+              value: errors.subscriptions ? "Error" : subscriptions.length,
+              error: !!errors.subscriptions 
+            },
+            { 
+              label: "Active", 
+              value: errors.subscriptions ? "Error" : subscriptions.filter(s => s.status === "active").length,
+              error: !!errors.subscriptions
+            },
+            { 
+              label: "Team Members", 
+              value: errors.teamMembers ? "Error" : initialTeamMembers.length,
+              error: !!errors.teamMembers
+            },
+            { 
+              label: "Unread Alerts", 
+              value: errors.notifications ? "Error" : unreadCount,
+              error: !!errors.notifications
+            },
+          ].map(({ label, value, error }) => (
+            <div key={label} className={`bg-white rounded-lg border ${error ? 'border-red-200' : 'border-gray-200'} p-4`}>
+              <p className="text-sm text-gray-500 flex items-center gap-1">
+                {label}
+                {error && <Info className="h-3 w-3 text-red-400" title="Failed to load data" />}
+              </p>
+              <p className={`text-2xl font-semibold ${error ? 'text-red-600' : 'text-gray-900'}`}>{value}</p>
             </div>
           ))}
         </div>
@@ -135,7 +168,13 @@ export default function DashboardClient({
             <h2 className="text-base font-semibold text-gray-900">Subscriptions</h2>
           </div>
 
-          {subscriptions.length === 0 ? (
+          {errors.subscriptions ? (
+            <div className="px-4 sm:px-6 py-12 text-center">
+              <AlertTriangle className="h-8 w-8 text-red-500 mx-auto mb-2" />
+              <p className="text-sm font-medium text-gray-900">Failed to load subscriptions</p>
+              <p className="text-xs text-gray-500 mt-1">Please try refreshing the page or contact support if the issue persists.</p>
+            </div>
+          ) : subscriptions.length === 0 ? (
             <p className="px-4 sm:px-6 py-8 text-sm text-gray-500 text-center">
               No subscriptions yet.
             </p>
