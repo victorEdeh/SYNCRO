@@ -7,6 +7,8 @@ import { getInitialData } from "./page-data";
 import { AppClient } from "@/components/app/app-client";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const initialData = await getInitialData();
 

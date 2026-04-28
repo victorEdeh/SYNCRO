@@ -585,9 +585,8 @@ function AppContent({
     }
 
     return (
-        <UndoProvider>
-            <ErrorBoundary>
-                <AppLayout
+        <ErrorBoundary>
+            <AppLayout
                 activeView={activeView}
                 onViewChange={setActiveView}
                 mode={mode}
@@ -872,6 +871,6 @@ function AppContent({
                     darkMode={darkMode}
                 />
             )}
-        </UndoProvider>
+        </ErrorBoundary>
     );
 }
