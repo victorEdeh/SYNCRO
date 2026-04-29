@@ -8,7 +8,7 @@ The backend is responsible for:
 - **API Endpoints**: RESTful API for subscription management, user authentication, and analytics
 - **Authentication**: User registration, login, and session management
 - **Email Integration**: Gmail and Outlook scanning for subscription detection
-- **Payment Processing**: Integration with Stripe and Paystack for payment handling
+- **Payment Processing**: Integration with Stripe for payment handling
 - **Notifications**: Telegram bot integration for subscription reminders
 - **Data Persistence**: Database operations for subscriptions, users, and related data
 
@@ -19,34 +19,43 @@ The backend is responsible for:
 - **Language**: JavaScript/TypeScript (to be determined)
 - **Database**: To be configured (PostgreSQL recommended)
 - **Authentication**: JWT tokens with HTTP-only cookies
-- **Payment Providers**: Stripe, Paystack
+- **Payment Providers**: Stripe
 - **External Services**: Gmail API, Microsoft 365 API, Telegram Bot API
 
 ## Project Structure
 
 ```
 backend/
-├── node_modules/
-├── package.json
-├── package-lock.json
-└── .gitignore
+├── src/
+│   ├── routes/          # 20+ functional API routes
+│   ├── services/        # 30+ core business logic services
+│   ├── middleware/      # Auth, security, and validation middleware
+│   ├── models/          # Database models
+│   ├── utils/           # Shared utility functions
+│   └── index.ts         # Server entry point
+├── tests/               # Comprehensive test suites
+├── scripts/             # Deployment and maintenance scripts
+└── package.json
 ```
 
-## Current State
+## Current State (April 2026)
 
 ### ✅ Implemented
-- Basic Express.js setup
-- Package configuration with Express dependency
+- **Robust API**: 20+ routes for subscriptions, analytics, teams, MFA, and more.
+- **Service Layer**: 30+ services including Reminder Engine, Risk Detection, and Blockchain Service.
+- **Advanced Security**: Redis-backed rate limiting, PII redaction, and secret management.
+- **Database**: PostgreSQL integration with migrations and structured models.
+- **Integrations**: Gmail/Outlook API scanning, Stripe/Paystack webhooks.
+
+### ⚠️ Partially Implemented
+- **AI Models**: Refining subscription detection and forecasting algorithms.
+- **Real-time Engine**: Finalizing WebSocket-based push notification delivery.
 
 ### ❌ Not Implemented
-- API route handlers
-- Database connection and models
-- Authentication middleware
-- Email scanning services
-- Payment processing endpoints
-- Telegram bot integration
-- Error handling middleware
-- Request validation
+- **Mainnet Automation**: Currently optimized for Stellar Testnet; awaiting mainnet-ready card issuance.
+
+**Owner**: Backend Team
+**Update Cadence**: Every Sprint
 
 ### ✅ Security Features
 - **Rate Limiting**: Comprehensive rate limiting on authentication endpoints
@@ -102,7 +111,6 @@ MICROSOFT_REDIRECT_URI=http://localhost:3001/api/integrations/outlook/callback
 # Payment Providers
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
-PAYSTACK_SECRET_KEY=sk_test_...
 
 # Telegram Bot
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token
@@ -171,8 +179,6 @@ npm run dev
 #### Payments
 - `POST /api/payments/stripe/checkout` - Create Stripe checkout session
 - `POST /api/payments/stripe/webhook` - Stripe webhook handler
-- `POST /api/payments/paystack/initialize` - Initialize Paystack payment
-- `POST /api/payments/paystack/verify` - Verify Paystack payment
 
 #### Notifications
 - `GET /api/notifications` - List notifications
@@ -206,7 +212,6 @@ npm run dev
 1. Gmail API integration
 2. Microsoft 365 / Outlook integration
 3. Stripe payment processing
-4. Paystack payment processing
 5. Telegram bot integration
 
 ### Phase 4: Advanced Features

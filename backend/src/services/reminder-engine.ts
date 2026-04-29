@@ -2,6 +2,7 @@ import logger from '../config/logger';
 import { supabase } from '../config/database';
 import { emailService } from './email-service';
 import { pushService, PushSubscription } from './push-service';
+import { telegramBotService } from './telegram-bot-service';
 import { blockchainService } from './blockchain-service';
 import {
   ReminderSchedule,
@@ -13,8 +14,10 @@ import {
 import { calculateBackoffDelay } from '../utils/retry';
 import { userPreferenceService } from './user-preference-service';
 import { notificationPreferenceService } from './notification-preference-service';
+import { reminderSettingsService } from './reminder-settings-service';
 import { quietHoursService } from './quiet-hours-service';
 import { delayedNotificationService } from './delayed-notification-service';
+import { analyticsService } from './analytics-service';
 
 export interface ReminderEngineOptions {
   defaultDaysBefore?: number[];
@@ -94,7 +97,7 @@ export class ReminderEngine {
         try {
           // Check if it's an appropriate time to send delayed notifications
           const userPreferences = await userPreferenceService.getPreferences(delayedNotification.user_id);
-          
+
           if (!quietHoursService.isAppropriateTimeForDelayedNotifications(userPreferences)) {
             logger.debug(`Skipping delayed notification ${delayedNotification.id} - not appropriate time`);
             continue;
@@ -102,10 +105,10 @@ export class ReminderEngine {
 
           // Send the delayed notification
           await this.sendDelayedNotification(delayedNotification);
-          
+
           // Mark as sent
           await delayedNotificationService.markDelayedNotificationAsSent(delayedNotification.id);
-          
+
           logger.info(`Delayed notification ${delayedNotification.id} sent successfully`);
         } catch (error) {
           logger.error(`Failed to process delayed notification ${delayedNotification.id}:`, error);
@@ -118,12 +121,127 @@ export class ReminderEngine {
   }
 
   /**
+   * Check for insufficient wallet balance for prepaid users
+   */
+  async checkInsufficientBalance(): Promise<void> {
+    logger.info('Checking for insufficient wallet balance');
+
+    try {
+      // Get all users with budgets
+      const { data: budgets, error } = await supabase
+        .from('monthly_budgets')
+        .select('user_id, budget_limit')
+        .is('category', null); // Overall budget
+
+      if (error) {
+        logger.error('Failed to fetch budgets:', error);
+        throw error;
+      }
+
+      if (!budgets || budgets.length === 0) {
+        logger.info('No users with budgets found');
+        return;
+      }
+
+      for (const budget of budgets) {
+        try {
+          await this.checkUserInsufficientBalance(budget.user_id, budget.budget_limit);
+        } catch (error) {
+          logger.error(`Failed to check balance for user ${budget.user_id}:`, error);
+        }
+      }
+    } catch (error) {
+      logger.error('Error checking insufficient balance:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check insufficient balance for a specific user
+   */
+  private async checkUserInsufficientBalance(userId: string, budgetLimit: number): Promise<void> {
+    // Get analytics summary to get current spend
+    const summary = await analyticsService.getSummary(userId);
+    const remainingBalance = budgetLimit - summary.budget_status.current_spend;
+
+    if (remainingBalance <= 0) {
+      // Already over budget, perhaps already alerted
+      return;
+    }
+
+    // Get active subscriptions
+    const { data: subscriptions, error } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'active');
+
+    if (error) {
+      logger.error('Failed to fetch subscriptions:', error);
+      throw error;
+    }
+
+    if (!subscriptions || subscriptions.length === 0) {
+      return;
+    }
+
+    const userProfile = await this.getUserProfile(userId);
+    if (!userProfile) {
+      logger.warn(`User profile ${userId} not found`);
+      return;
+    }
+
+    const preferences = await userPreferenceService.getPreferences(userId);
+
+    for (const sub of subscriptions) {
+      if (sub.price > remainingBalance) {
+        // Send critical alert
+        const payload: NotificationPayload = {
+          title: 'Insufficient Wallet Balance',
+          body: `Wallet balance ($${remainingBalance.toFixed(2)}) is insufficient for ${sub.name} ($${sub.price.toFixed(2)}).`,
+          subscription: sub as Subscription,
+          reminderType: 'renewal',
+          daysBefore: 0,
+          renewalDate: sub.next_billing_date || new Date().toISOString(),
+          priority: 'critical',
+        };
+
+        // Send directly without delivery records
+        const deliveryChannels = preferences.notification_channels;
+
+        // Email delivery
+        if (deliveryChannels.includes('email') && preferences.email_opt_ins.reminders) {
+          await emailService.sendReminderEmail(
+            userProfile.email,
+            payload,
+            { maxAttempts: this.maxRetryAttempts },
+          );
+        }
+
+        // Push delivery
+        if (deliveryChannels.includes('push')) {
+          const pushSubscription = await this.getPushSubscription(userId);
+          if (pushSubscription) {
+            await pushService.sendPushNotification(
+              pushSubscription,
+              payload,
+              { maxAttempts: this.maxRetryAttempts },
+            );
+          }
+        }
+
+        logger.info(`Sent insufficient balance alert for user ${userId}, subscription ${sub.name}`);
+      }
+    }
+  }
+
+  /**
    * Send a delayed notification
    */
   private async sendDelayedNotification(delayedNotification: any): Promise<void> {
     const payload = delayedNotification.notification_payload;
     const userPreferences = await userPreferenceService.getPreferences(delayedNotification.user_id);
-    
+
     // Get user profile for email
     const userProfile = await this.getUserProfile(delayedNotification.user_id);
     if (!userProfile) {
@@ -143,6 +261,16 @@ export class ReminderEngine {
       if (pushSubscription) {
         await pushService.sendPushNotification(pushSubscription, payload, { maxAttempts: 1 });
       }
+    }
+
+    // Telegram delivery
+    if (deliveryChannels.includes('telegram') && telegramBotService.isConfigured()) {
+      await telegramBotService.sendRenewalReminder(
+        delayedNotification.user_id,
+        payload,
+        undefined,
+        { maxAttempts: 1 }
+      );
     }
   }
 
@@ -322,10 +450,10 @@ export class ReminderEngine {
       payload.priority = quietHoursService.determineNotificationPriority(payload);
 
       const preferences = await userPreferenceService.getPreferences(reminder.user_id);
-      
+
       // Check quiet hours
       const quietHoursCheck = quietHoursService.shouldSendDuringQuietHours(preferences, payload);
-      
+
       if (quietHoursCheck.shouldDelay) {
         // Store notification for later delivery
         await delayedNotificationService.storeDelayedNotification(
@@ -336,7 +464,7 @@ export class ReminderEngine {
           payload.priority!,
           quietHoursCheck.reason
         );
-        
+
         // Mark reminder as sent (it's scheduled for later)
         await supabase
           .from('reminder_schedules')
@@ -345,7 +473,7 @@ export class ReminderEngine {
             updated_at: new Date().toISOString(),
           })
           .eq('id', reminder.id);
-          
+
         logger.info(`Reminder ${reminder.id} delayed due to quiet hours until ${quietHoursCheck.delayUntil?.toISOString()}`);
         return;
       }
@@ -409,6 +537,34 @@ export class ReminderEngine {
             `No push subscription found for user ${reminder.user_id}, skipping push delivery`,
           );
         }
+      }
+
+      // Telegram delivery
+      if (deliveryChannels.includes('telegram') && telegramBotService.isConfigured()) {
+        const telegramDelivery = await this.createDeliveryRecord(
+          reminder.id,
+          reminder.user_id,
+          'telegram',
+        );
+        deliveries.push(telegramDelivery);
+
+        const telegramResult = await telegramBotService.sendRenewalReminder(
+          reminder.user_id,
+          payload,
+          undefined, // Let service look up chat ID
+          { maxAttempts: this.maxRetryAttempts },
+        );
+
+        await this.updateDeliveryRecord(
+          telegramDelivery.id,
+          telegramResult.success ? 'sent' : 'failed',
+          telegramResult.error,
+          telegramResult.metadata,
+        );
+      } else if (deliveryChannels.includes('telegram') && !telegramBotService.isConfigured()) {
+        logger.debug(
+          `Telegram delivery requested for user ${reminder.user_id} but service not configured`,
+        );
       }
 
       await blockchainService.logReminderEvent(
@@ -489,6 +645,13 @@ export class ReminderEngine {
         if (!result.success && result.metadata?.retryable === false) {
           await this.removeStalePushSubscription(delivery.user_id);
         }
+      } else if (delivery.channel === 'telegram') {
+        result = await telegramBotService.sendRenewalReminder(
+          delivery.user_id,
+          payload,
+          undefined,
+          { maxAttempts: 1 }
+        );
       } else {
         await this.markDeliveryAsFailed(delivery.id, `Unknown channel: ${delivery.channel}`);
         return;
@@ -639,8 +802,9 @@ export class ReminderEngine {
     // 2. User global settings
     try {
       const userPrefs = await userPreferenceService.getPreferences(userId);
+      const reminderSettings = await reminderSettingsService.getSettings(userId);
       return {
-        reminder_days_before: userPrefs.reminder_timing ?? this.defaultDaysBefore,
+        reminder_days_before: reminderSettings.reminder_days_before,
         channels: userPrefs.notification_channels ?? ['email'],
         muted: false,
       };
@@ -777,7 +941,7 @@ export class ReminderEngine {
   private async createDeliveryRecord(
     reminderScheduleId: string,
     userId: string,
-    channel: 'email' | 'push',
+    channel: 'email' | 'push' | 'telegram',
   ): Promise<NotificationDelivery> {
     const { data, error } = await supabase
       .from('notification_deliveries')

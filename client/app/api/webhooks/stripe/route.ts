@@ -19,9 +19,10 @@ export async function POST(request: NextRequest) {
       throw new Error("Missing stripe-signature or webhook secret")
     }
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
-  } catch (err: any) {
-    console.error(`Webhook signature verification failed: ${err.message}`)
-    return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 })
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+    console.error(`Webhook signature verification failed: ${errorMessage}`)
+    return NextResponse.json({ error: `Webhook Error: ${errorMessage}` }, { status: 400 })
   }
 
   const supabase = await createClient()
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
       
       // Here you would also update the user's subscription record
       // e.g., extend active_until, update plan_name, etc.
-      if (paymentIntentSucceeded.metadata.userId) {
+      if (paymentIntentSucceeded.metadata?.userId) {
         await supabase
           .from("profiles")
           .update({ 

@@ -23,32 +23,32 @@ The contracts folder contains Soroban smart contracts that will enable:
 
 ```
 contracts/
-├── Cargo.toml                    # Workspace configuration
 ├── contracts/
-│   └── hello-world/             # Example contract (to be replaced)
-│       ├── Cargo.toml
-│       ├── Makefile
-│       └── src/
-│           ├── lib.rs           # Contract implementation
-│           └── test.rs           # Contract tests
-└── README.md
+│   ├── subscription_renewal/    # Main renewal logic
+│   ├── virtual-card/            # Card interface
+│   ├── escrow/                  # Payment holding
+│   ├── agent-registry/          # Authorized agents
+│   └── subscription_logging/    # On-chain audit trail
+├── scripts/                     # Deployment and snapshot scripts
+└── Cargo.toml
 ```
 
-## Current State
+## Current State (April 2026)
 
 ### ✅ Implemented
-- Soroban workspace setup
-- Example hello-world contract structure
-- Build configuration
-- Test framework setup
+- **Core Contracts**: Functional renewal, escrow, and registry contracts.
+- **On-chain Logging**: Structured audit trail for subscription events.
+- **Stellar SDK 23**: Built on the latest Soroban stable release.
+- **Test Infrastructure**: Automated snapshots and delegated execution tests.
+
+### ⚠️ Partially Implemented
+- **Mainnet Deployment**: Currently undergoing Testnet verification and security hardening.
 
 ### ❌ Not Implemented
-- Subscription management contract
-- Payment processing contract
-- Gift card tracking contract
-- Integration with Stellar network
-- Contract deployment scripts
-- Contract interaction utilities
+- **Direct Card Issuance**: Pending Stellar ecosystem availability for non-custodial virtual cards.
+
+**Owner**: Smart Contracts Team
+**Update Cadence**: Per Major Contract Change
 
 ## Setup
 

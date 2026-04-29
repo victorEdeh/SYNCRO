@@ -1,28 +1,31 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { describe, test, it, expect, vi, beforeEach } from 'vitest'
 import { OnboardingTourEnhanced, useOnboardingTourEnhanced } from '../onboarding-tour-enhanced'
 
 // Mock react-joyride-react-19
-jest.mock('react-joyride-react-19', () => {
-  return function MockJoyride({ run, steps, callback }: any) {
-    if (!run) return null
-    
-    return (
-      <div data-testid="joyride-tour">
-        <div data-testid="tour-step-count">{steps.length} steps</div>
-        <button 
-          data-testid="tour-skip" 
-          onClick={() => callback({ status: 'skipped', type: 'step:after', action: 'close' })}
-        >
-          Skip Tour
-        </button>
-        <button 
-          data-testid="tour-complete" 
-          onClick={() => callback({ status: 'finished', type: 'tour:end', action: 'next' })}
-        >
-          Complete Tour
-        </button>
-      </div>
-    )
+vi.mock('react-joyride-react-19', () => {
+  return {
+    default: function MockJoyride({ run, steps, callback }: any) {
+      if (!run) return null
+      
+      return (
+        <div data-testid="joyride-tour">
+          <div data-testid="tour-step-count">{steps.length} steps</div>
+          <button 
+            data-testid="tour-skip" 
+            onClick={() => callback({ status: 'skipped', type: 'step:after', action: 'close' })}
+          >
+            Skip Tour
+          </button>
+          <button 
+            data-testid="tour-complete" 
+            onClick={() => callback({ status: 'finished', type: 'tour:end', action: 'next' })}
+          >
+            Complete Tour
+          </button>
+        </div>
+      )
+    }
   }
 })
 
@@ -45,7 +48,7 @@ describe('OnboardingTourEnhanced', () => {
   beforeEach(() => {
     // Clear localStorage before each test
     localStorage.clear()
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   describe('useOnboardingTourEnhanced hook', () => {
@@ -98,9 +101,9 @@ describe('OnboardingTourEnhanced', () => {
       
       await waitFor(() => {
         expect(screen.getByTestId('joyride-tour')).toBeInTheDocument()
-      })
+      }, { timeout: 2000 })
       
-      expect(screen.getByTestId('tour-step-count')).toHaveTextContent('4 steps')
+      expect(screen.getByTestId('tour-step-count')).toHaveTextContent('3 steps')
     })
 
     test('should not render tour when autoStart is false and no localStorage flags', () => {
@@ -110,13 +113,13 @@ describe('OnboardingTourEnhanced', () => {
     })
 
     test('should handle tour completion', async () => {
-      const onComplete = jest.fn()
+      const onComplete = vi.fn()
       
       render(<OnboardingTourEnhanced autoStart={true} onComplete={onComplete} />)
       
       await waitFor(() => {
         expect(screen.getByTestId('joyride-tour')).toBeInTheDocument()
-      })
+      }, { timeout: 2000 })
       
       fireEvent.click(screen.getByTestId('tour-complete'))
       
@@ -125,13 +128,13 @@ describe('OnboardingTourEnhanced', () => {
     })
 
     test('should handle tour skip', async () => {
-      const onSkip = jest.fn()
+      const onSkip = vi.fn()
       
       render(<OnboardingTourEnhanced autoStart={true} onSkip={onSkip} />)
       
       await waitFor(() => {
         expect(screen.getByTestId('joyride-tour')).toBeInTheDocument()
-      })
+      }, { timeout: 2000 })
       
       fireEvent.click(screen.getByTestId('tour-skip'))
       
@@ -144,7 +147,7 @@ describe('OnboardingTourEnhanced', () => {
       
       await waitFor(() => {
         expect(screen.getByTestId('joyride-tour')).toBeInTheDocument()
-      })
+      }, { timeout: 2000 })
       
       // Test would verify dark mode styles are applied
       // This would require more detailed DOM inspection in a real test

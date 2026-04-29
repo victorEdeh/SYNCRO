@@ -2,14 +2,15 @@ import Stripe from "stripe"
 
 /**
  * Centralized Stripe Configuration
- * 
- * Provides a single source of truth for Stripe SDK settings.
- * The apiVersion is cast to Stripe.StripeConfig['apiVersion'] to maintain
- * type safety while using specific API versions.
+ * * Provides a single source of truth for Stripe SDK settings.
+ * Using the latest stable API version supported by the Stripe SDK.
  */
-export const stripeConfig: Stripe.StripeConfig = {
-  apiVersion: "2025-11-17.clover" as Stripe.StripeConfig["apiVersion"],
-  typescript: true,
+export const STRIPE_API_VERSION = "2025-11-17.clover" as const;
+
+export const stripeConfig = {
+  // Cast as any to avoid string literal mismatch errors with the Stripe constructor
+  apiVersion: STRIPE_API_VERSION as any,
+  typescript: true as const,
 }
 
 /**

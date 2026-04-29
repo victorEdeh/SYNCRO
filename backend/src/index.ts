@@ -19,7 +19,7 @@ Sentry.init({
 });
 
 import logger from './config/logger';
-import { requestIdMiddleware, RequestWithContext } from './middleware/requestContext';
+import { requestIdMiddleware } from './middleware/requestContext';
 import { requestLoggerMiddleware } from './middleware/requestLogger';
 import { schedulerService } from './services/scheduler';
 import { reminderEngine } from './services/reminder-engine';
@@ -34,13 +34,10 @@ import webhookRoutes from './routes/webhooks';
 import complianceRoutes from './routes/compliance';
 import tagsRoutes from './routes/tags';
 import userRoutes from './routes/user';
-import userPreferencesRoutes from './routes/user-preferences';
 import apiKeysRoutes from './routes/api-keys';
 import digestRoutes from './routes/digest';
 import mfaRoutes from './routes/mfa';
 import pushNotificationRoutes from './routes/push-notifications';
-import referralRoutes from './routes/referrals';
-import suggestionRoutes from './routes/suggestions';
 import gmailRouter from '../routes/integrations/gmail'
 import outlookRouter from '../routes/integrations/outlook'
 import { createExchangeRatesRouter } from './routes/exchange-rates';
@@ -53,9 +50,9 @@ import { eventListener } from './services/event-listener';
 import { expiryService } from './services/expiry-service';
 import { authenticate } from './middleware/auth'
 import { adminAuth } from './middleware/admin';
-import { csrfProtection } from './middleware/csrf';
 import { createAdminLimiter, RateLimiterFactory } from './middleware/rate-limit-factory';
 import { scheduleAutoResume } from './jobs/auto-resume';
+import giftCardLedgerRoutes from './routes/gift-card-ledger';
 import { errorHandler } from './middleware/errorHandler';
 import { swaggerSpec } from './swagger';
 
@@ -83,7 +80,7 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', FRONTEND_URL);
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Idempotency-Key, If-Match, x-csrf-token');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Idempotency-Key, If-Match');
 
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
@@ -99,9 +96,6 @@ app.use(express.urlencoded({ extended: true }));
 // Request context and logging
 app.use(requestIdMiddleware);
 app.use(requestLoggerMiddleware);
-
-// CSRF protection (double-submit cookie) for all mutating API routes
-app.use('/api', csrfProtection);
 
 // Public Endpoints
 app.get('/health', (req, res) => {
@@ -129,13 +123,11 @@ app.use('/api/webhooks', webhookRoutes);
 app.use('/api/compliance', complianceRoutes);
 app.use('/api/tags', tagsRoutes);
 app.use('/api/user', userRoutes);
-app.use('/api/user-preferences', authenticate, userPreferencesRoutes);
 app.use('/api/digest', digestRoutes);
 app.use('/api/mfa', mfaRoutes);
 app.use('/api/notifications/push', pushNotificationRoutes);
-app.use('/api/referrals', referralRoutes);
-app.use('/api/suggestions', suggestionRoutes);
 app.use('/api/exchange-rates', createExchangeRatesRouter(exchangeRateService));
+app.use('/api/gift-card-ledger', giftCardLedgerRoutes);
 
 app.get('/api/reminders/status', (req, res) => {
   const status = schedulerService.getStatus();
@@ -143,37 +135,37 @@ app.get('/api/reminders/status', (req, res) => {
 });
 
 // Admin Monitoring Endpoints
-app.get('/api/admin/metrics/subscriptions', createAdminLimiter(), adminAuth, async (req: RequestWithContext, res) => {
+app.get('/api/admin/metrics/subscriptions', createAdminLimiter(), adminAuth, async (req, res) => {
   try {
-    const metrics = await monitoringService.getSubscriptionMetrics(req.requestId);
+    const metrics = await monitoringService.getSubscriptionMetrics();
     res.json(metrics);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch subscription metrics' });
   }
 });
 
-app.get('/api/admin/metrics/renewals', createAdminLimiter(), adminAuth, async (req: RequestWithContext, res) => {
+app.get('/api/admin/metrics/renewals', createAdminLimiter(), adminAuth, async (req, res) => {
   try {
-    const metrics = await monitoringService.getRenewalMetrics(req.requestId);
+    const metrics = await monitoringService.getRenewalMetrics();
     res.json(metrics);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch renewal metrics' });
   }
 });
 
-app.get('/api/admin/metrics/activity', createAdminLimiter(), adminAuth, async (req: RequestWithContext, res) => {
+app.get('/api/admin/metrics/activity', createAdminLimiter(), adminAuth, async (req, res) => {
   try {
-    const metrics = await monitoringService.getAgentActivity(req.requestId);
+    const metrics = await monitoringService.getAgentActivity();
     res.json(metrics);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch agent activity' });
   }
 });
 
-app.get('/api/admin/health', createAdminLimiter(), adminAuth, async (req: RequestWithContext, res) => {
+app.get('/api/admin/health', createAdminLimiter(), adminAuth, async (req, res) => {
   try {
     const includeHistory = req.query.history !== 'false';
-    const health = await healthService.getAdminHealth(includeHistory, eventListener.getHealth(), req.requestId);
+    const health = await healthService.getAdminHealth(includeHistory, eventListener.getHealth());
     const statusCode = health.status === 'unhealthy' ? 503 : 200;
     res.status(statusCode).json({
       ...health,
@@ -214,16 +206,6 @@ app.post('/api/reminders/retry', createAdminLimiter(), adminAuth, async (req, re
   } catch (error) {
     logger.error('Error processing retries:', error);
     res.status(500).json({ success: false, error: 'Failed to process retries' });
-  }
-});
-
-app.post('/api/reminders/delayed', createAdminLimiter(), adminAuth, async (req, res) => {
-  try {
-    await reminderEngine.processDelayedNotifications();
-    res.json({ success: true, message: 'Delayed notifications processed' });
-  } catch (error) {
-    logger.error('Error processing delayed notifications:', error);
-    res.status(500).json({ success: false, error: 'Failed to process delayed notifications' });
   }
 });
 
