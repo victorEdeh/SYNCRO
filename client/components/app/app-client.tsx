@@ -67,8 +67,6 @@ import type {
 
 import { UserSettingsProvider } from "@/components/providers/user-settings-provider";
 
-interface AppContentProps extends AppClientProps {}
-
 export function AppClient({
     initialSubscriptions,
     initialEmailAccounts,
