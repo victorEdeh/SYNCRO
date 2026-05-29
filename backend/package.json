@@ -21,7 +21,8 @@
     "audit:rls": "node ../scripts/check-rls-compliance.js",
     "audit:rls:local": "node ../scripts/run-rls-audit-local.js",
     "test:rls-audit": "node ../scripts/test-rls-audit.js",
-    "check:migrations": "node ../scripts/check-migration-drift.js"
+    "check:migrations": "node ../scripts/check-migration-drift.js",
+    "audit:routes": "node scripts/validate-route-validation.js"
   },
   "dependencies": {
     "@sentry/node": "^10.50.0",

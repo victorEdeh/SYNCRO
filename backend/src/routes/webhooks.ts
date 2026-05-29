@@ -4,6 +4,7 @@ import { authenticate, AuthenticatedRequest } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import logger from '../config/logger';
 import { createWebhookSchema, updateWebhookSchema } from '../schemas/webhook';
+import { uuidParamSchema } from '../schemas/common';
 
 const router: Router = Router();
 
@@ -29,6 +30,7 @@ router.post('/', validate(createWebhookSchema), async (req: AuthenticatedRequest
 /**
  * GET /api/webhooks
  */
+// VALIDATION_BYPASS: No request parameters needed
 router.get('/', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const webhooks = await webhookService.listWebhooks(req.user!.id);
@@ -45,7 +47,7 @@ router.get('/', async (req: AuthenticatedRequest, res: Response) => {
 /**
  * PUT /api/webhooks/:id
  */
-router.put('/:id', validate(updateWebhookSchema), async (req: AuthenticatedRequest, res: Response) => {
+router.put('/:id', validate(uuidParamSchema, 'params'), validate(updateWebhookSchema), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const webhook = await webhookService.updateWebhook(
       req.user!.id,
@@ -65,7 +67,7 @@ router.put('/:id', validate(updateWebhookSchema), async (req: AuthenticatedReque
 /**
  * DELETE /api/webhooks/:id
  */
-router.delete('/:id', async (req: AuthenticatedRequest, res: Response) => {
+router.delete('/:id', validate(uuidParamSchema, 'params'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     await webhookService.deleteWebhook(
       req.user!.id,
@@ -84,7 +86,7 @@ router.delete('/:id', async (req: AuthenticatedRequest, res: Response) => {
 /**
  * POST /api/webhooks/:id/test
  */
-router.post('/:id/test', async (req: AuthenticatedRequest, res: Response) => {
+router.post('/:id/test', validate(uuidParamSchema, 'params'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const delivery = await webhookService.triggerTestEvent(
       req.user!.id,
@@ -103,7 +105,7 @@ router.post('/:id/test', async (req: AuthenticatedRequest, res: Response) => {
 /**
  * GET /api/webhooks/:id/deliveries
  */
-router.get('/:id/deliveries', async (req: AuthenticatedRequest, res: Response) => {
+router.get('/:id/deliveries', validate(uuidParamSchema, 'params'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const deliveries = await webhookService.getDeliveries(
       req.user!.id,

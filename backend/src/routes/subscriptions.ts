@@ -217,6 +217,26 @@ router.delete('/:id', validateSubscriptionOwnership, async (req: AuthenticatedRe
 });
 
 /**
+ * POST /api/subscriptions/:id/restore
+ * Restore a soft-deleted subscription
+ */
+router.post('/:id/restore', validateSubscriptionOwnership, async (req: AuthenticatedRequest, res: Response) => {
+  const result = await subscriptionService.restoreSubscription(req.user!.id, req.params.id);
+  
+  const statusCode = result.syncStatus === 'failed' ? 207 : 200;
+  res.status(statusCode).json({
+    success: true,
+    message: 'Subscription restored',
+    data: result.subscription,
+    blockchain: {
+      synced: result.syncStatus === 'synced',
+      transactionHash: result.blockchainResult?.transactionHash,
+      error: result.blockchainResult?.error,
+    },
+  });
+});
+
+/**
  * GET /api/subscriptions/:id/price-history
  */
 router.get('/:id/price-history', validateSubscriptionOwnership, async (req: AuthenticatedRequest, res: Response) => {

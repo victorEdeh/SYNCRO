@@ -108,8 +108,16 @@ export async function scanOutlookSubscriptions({
   let token = accessToken;
 
   if (expiresAt && refreshToken && new Date(expiresAt) <= new Date()) {
-    const refreshed = await refreshOutlookToken(refreshToken);
-    token = refreshed.access_token;
+    try {
+      const refreshed = await refreshOutlookToken(refreshToken);
+      token = refreshed.access_token;
+      // In a real implementation we should also emit an event or callback to update the DB with the new tokens
+    } catch (err: any) {
+      if (err.message?.includes('invalid_grant') || err.message?.includes('interaction_required')) {
+        throw new Error('AUTH_REVOKED: Outlook token rotation failed. Re-authentication required.');
+      }
+      throw err;
+    }
   }
 
   const searchQuery = KEYWORDS.join(" OR ");
@@ -127,8 +135,13 @@ export async function scanOutlookSubscriptions({
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Outlook message scan failed: ${error}`);
+    const errorText = await response.text();
+    if (response.status === 401) {
+      throw new Error(`AUTH_REVOKED: Outlook message scan unauthorized: ${errorText}`);
+    } else if (response.status === 429) {
+      throw new Error(`RATE_LIMITED: Outlook message scan throttled: ${errorText}`);
+    }
+    throw new Error(`Outlook message scan failed: ${errorText}`);
   }
 
   const data = (await response.json()) as { value?: any[] };
