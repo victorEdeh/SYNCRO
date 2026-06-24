@@ -73,6 +73,7 @@ import userPreferencesRoutes from './routes/user-preferences';
 import reminderSettingsRoutes from './routes/reminder-settings';
 import { blockchainReconciliationService } from './services/blockchain-reconciliation-service';
 import paymentsRoutes from './routes/payments';
+import agentWalletsRoutes from './routes/agent-wallets';
 import { errorHandler } from './middleware/errorHandler';
 import { swaggerSpec } from './swagger';
 
@@ -172,6 +173,8 @@ app.get('/api/reminders/status', (req, res) => {
 });
 
 // Admin Monitoring Endpoints
+app.use('/api/admin/agent-wallets', createAdminLimiter(), agentWalletsRoutes);
+
 app.get('/api/admin/metrics/subscriptions', createAdminLimiter(), adminAuth, async (req, res) => {
   try {
     const metrics = await monitoringService.getSubscriptionMetrics();
