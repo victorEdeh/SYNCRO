@@ -1,4 +1,5 @@
 import { getBlockchainFlags } from '../../shared/blockchain-flags';
+import { deriveSubscriptionEncryptionKey } from '../../shared/src/crypto/key-derivation';
 
 type WalletInfo = {
   publicKey: string;
@@ -13,6 +14,8 @@ class StellarWalletService {
   private wallet: WalletInfo | null = null;
   private listeners: Map<WalletEventType, Set<WalletEventHandler>> = new Map();
   private readonly STORAGE_KEY = 'stellar_wallet_session';
+  /** In-memory session cache for derived encryption key — never persisted. */
+  private _encryptionKey: string | null = null;
 
   constructor() {
     this.loadSession();
@@ -47,6 +50,7 @@ class StellarWalletService {
   disconnect(): void {
     const wasConnected = this.wallet !== null;
     this.wallet = null;
+    this._encryptionKey = null;
     this.clearSession();
     if (wasConnected) this.emit('walletDisconnected');
   }
@@ -73,6 +77,26 @@ class StellarWalletService {
     });
 
     return signedXdr;
+  }
+
+  /**
+   * Derives and caches the AES-256 encryption key for this session using
+   * HKDF-SHA256 from the Stellar Ed25519 seed.
+   *
+   * The derived key is held in memory only — never written to disk or DB.
+   * Call this once per session after the user provides their secret key seed.
+   *
+   * @param stellarSecretKeySeed - Raw 32-byte Ed25519 seed.
+   */
+  deriveAndCacheEncryptionKey(stellarSecretKeySeed: Uint8Array): void {
+    this._encryptionKey = deriveSubscriptionEncryptionKey(stellarSecretKeySeed);
+  }
+
+  /**
+   * Returns the in-memory encryption key for this session, or null if not yet derived.
+   */
+  getEncryptionKey(): string | null {
+    return this._encryptionKey;
   }
 
   on(event: WalletEventType, handler: WalletEventHandler): () => void {
