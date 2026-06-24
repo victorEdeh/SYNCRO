@@ -17,6 +17,7 @@ jest.mock('../src/config/database', () => ({
 }));
 
 jest.mock('../src/config/logger', () => ({
+  __esModule: true,
   default: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
 
@@ -33,7 +34,7 @@ jest.mock('../src/services/agent-hd-wallet', () => {
 });
 
 // Mock blockchain flags so drain skips network calls
-jest.mock('../../../../shared/blockchain-flags', () => ({
+jest.mock('../../shared/blockchain-flags', () => ({
   getBlockchainFlags: jest.fn().mockReturnValue({ blockchainEnabled: false }),
   resolveStellarNetwork: jest.fn().mockReturnValue('testnet'),
 }), { virtual: true });

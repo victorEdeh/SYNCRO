@@ -15,6 +15,7 @@ import {
   getBlockchainFlags,
   resolveStellarNetwork,
 } from "../../../shared/blockchain-flags";
+import { agentWalletRotationService } from './agent-wallet-rotation';
 import { EXTERNAL_SERVICE_POLICIES } from "../config/external-services";
 import {
   BLOCKCHAIN_INVOKE_METHODS,
@@ -529,13 +530,26 @@ export class BlockchainService {
 
     const rpc = new SorobanRpc.Server(this.rpcUrl);
     
-    // Fetch secret from provider
-    const secret = await secretProvider.getSecret("STELLAR_SECRET_KEY");
-    if (!secret) {
-      throw new Error("STELLAR_SECRET_KEY not configured");
+    // Use rotated agent wallet keypair instead of a single static secret key.
+    // The "executor" agent is used for contract invocations; its address rotates
+    // on a configurable schedule (per-task, daily, weekly) to prevent address
+    // clustering.
+    let sourceKeypair: Keypair;
+    try {
+      const derived = await agentWalletRotationService.getActiveKeypair('executor');
+      sourceKeypair = derived.keypair;
+    } catch {
+      // Fallback to the legacy STELLAR_SECRET_KEY if the rotation service
+      // is not configured (e.g., AGENT_MASTER_SEED not set).
+      const secret = await secretProvider.getSecret("STELLAR_SECRET_KEY");
+      if (!secret) {
+        throw new Error(
+          "No signing key available: configure AGENT_MASTER_SEED (for HD wallet rotation) " +
+          "or set STELLAR_SECRET_KEY (legacy fallback).",
+        );
+      }
+      sourceKeypair = Keypair.fromSecret(secret);
     }
-    
-    const sourceKeypair = Keypair.fromSecret(secret);
     const contract = new Contract(this.contractAddress);
 
     let lastErr: unknown = null;

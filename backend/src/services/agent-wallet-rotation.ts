@@ -224,6 +224,7 @@ export class AgentWalletRotationService {
     newIndex: number,
     newPublicKey: string,
     now: string,
+    rotationCount: number,
   ): Promise<void> {
     const { error } = await supabase
       .from('agent_wallet_rotations')
@@ -231,7 +232,7 @@ export class AgentWalletRotationService {
         current_index:   newIndex,
         public_key:      newPublicKey,
         last_rotated_at: now,
-        rotation_count:  supabase.rpc ? undefined : undefined, // incremented by DB trigger
+        rotation_count:  rotationCount,
         updated_at:      now,
       })
       .eq('agent_name', agentName);
@@ -241,9 +242,6 @@ export class AgentWalletRotationService {
         `[AgentWalletRotation] Failed to update state for agent "${agentName}": ${error.message}`,
       );
     }
-
-    // Increment rotation_count separately (supabase doesn't support .increment in update easily)
-    await supabase.rpc('increment_rotation_count', { p_agent_name: agentName });
   }
 
   private async recordHistory(
@@ -410,6 +408,7 @@ export class AgentWalletRotationService {
     const previousIndex    = state.currentIndex;
     const previousPubKey   = state.publicKey;
     const newIndex         = previousIndex + 1;
+    const newRotationCount = state.rotationCount + 1;
 
     logger.info('[AgentWalletRotation] Rotating agent wallet', {
       agentName,
@@ -430,8 +429,8 @@ export class AgentWalletRotationService {
 
     const rotatedAt = new Date().toISOString();
 
-    // Persist new state
-    await this.updateState(agentName, newIndex, newDerived.publicKey, rotatedAt);
+    // Persist new state (rotation_count incremented atomically in same query)
+    await this.updateState(agentName, newIndex, newDerived.publicKey, rotatedAt, newRotationCount);
 
     // Record address history
     await this.recordHistory(
@@ -517,8 +516,8 @@ export class AgentWalletRotationService {
 
     // Rotate if due
     if (isRotationDue(state.lastRotatedAt, this.schedule)) {
-      await this.triggerRotation(agentName);
-      const fresh = await AgentHDWallet.deriveKeypair(agentName, state.currentIndex + 1);
+      const result = await this.triggerRotation(agentName);
+      const fresh = await AgentHDWallet.deriveKeypair(agentName, result!.newIndex);
       this.activeKeypairCache.set(agentName, fresh);
       return fresh;
     }

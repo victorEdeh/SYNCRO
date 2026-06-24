@@ -22,6 +22,7 @@ jest.mock('../src/services/secret-provider', () => ({
 }));
 
 jest.mock('../src/config/logger', () => ({
+  __esModule: true,
   default: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
 
@@ -29,6 +30,7 @@ describe('AgentHDWallet', () => {
   beforeEach(() => {
     // Flush the seed cache between tests so each test gets a fresh derivation
     AgentHDWallet.flushCache();
+    jest.clearAllMocks();
   });
 
   describe('AGENT_NAMES', () => {
